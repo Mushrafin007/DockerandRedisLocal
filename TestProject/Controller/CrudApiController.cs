@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 using StackExchange.Redis;
@@ -19,6 +20,7 @@ namespace TestProject.Controller
             _ICrudApiService = CrudApiService;
             _redis = redis;
         }
+        [Authorize]
         [Route("api/Crud/Create")]
         [HttpPost]
         public  async Task<JsonResult> create(CreateMode obj)

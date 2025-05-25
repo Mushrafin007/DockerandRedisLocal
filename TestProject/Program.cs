@@ -3,9 +3,13 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.OpenApi.Models;
 using StackExchange.Redis;
 using Swashbuckle.AspNetCore;
+using System.Text;
 using TestProject.Common;
 using TestProject.MiddleWare;
 using TestProject.Services.CrudApiService;
+using static TestProject.Model.LoginModel.AuthClass;
+using Microsoft.IdentityModel.Tokens; // Add this using directive
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -32,6 +36,29 @@ builder.Services.AddHostedService<RedisConsumerService>();
 Console.WriteLine("Connected to Redis!");
 
 /*Redis Config*/
+
+/*JWT Config*/
+builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("JwtSettings"));
+
+var jwtSettings = builder.Configuration.GetSection("JwtSettings").Get<JwtSettings>();
+var key = Encoding.UTF8.GetBytes(jwtSettings.SecretKey);
+
+builder.Services.AddAuthentication("Bearer")
+    .AddJwtBearer("Bearer", options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+
+            ValidIssuer = jwtSettings.Issuer,
+            ValidAudience = jwtSettings.Audience,
+            IssuerSigningKey = new SymmetricSecurityKey(key)
+        };
+    });
+/*JWT Config*/
 
 builder.Services.AddEndpointsApiExplorer();
 //builder.Services.AddSwaggerGen(c =>
