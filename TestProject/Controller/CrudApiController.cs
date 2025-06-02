@@ -1,9 +1,11 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using Confluent.Kafka;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 using StackExchange.Redis;
 using System.Net;
+using TestProject.Common;
 using TestProject.Services.CrudApiService;
 using static TestProject.Model.CrudApiModel;
 
@@ -14,11 +16,13 @@ namespace TestProject.Controller
     {
         ICrudApiService _ICrudApiService;
         IConnectionMultiplexer _redis;
+        private readonly CommonFunction _CommonFunctions;
 
-        public CrudApiController(ICrudApiService CrudApiService, IConnectionMultiplexer redis) 
+        public CrudApiController(ICrudApiService CrudApiService, IConnectionMultiplexer redis, CommonFunction commonFunctions) 
         {
             _ICrudApiService = CrudApiService;
             _redis = redis;
+            _CommonFunctions = commonFunctions;
         }
         [Authorize]
         [Route("api/Crud/Create")]
@@ -146,6 +150,40 @@ namespace TestProject.Controller
                 return StatusCode(500, new { status = 500, message = "Internal server error", error = ex.Message });
             }
         }
+
+        [HttpPost]
+        [Route("api/Crud/CreateWithKafka")]
+        public async Task<IActionResult> CreateWithKafka(CreateMode obj)
+        {
+            var bootstrapServers = _CommonFunctions.GetConfigKey("Kafka:BootstrapServers");
+            var topic = _CommonFunctions.GetConfigKey("Kafka:CreateUserTopic");
+
+            if (string.IsNullOrEmpty(bootstrapServers) || string.IsNullOrEmpty(topic))
+            {
+                return BadRequest(new { status = 400, message = "Kafka configuration missing" });
+            }
+
+            var config = new ProducerConfig
+            {
+                BootstrapServers = bootstrapServers
+            };
+
+            using var producer = new ProducerBuilder<Null, string>(config).Build();
+
+            var jsonData = JsonConvert.SerializeObject(obj);
+
+            try
+            {
+                var result = await producer.ProduceAsync(topic, new Message<Null, string> { Value = jsonData });
+
+                return Ok(new { status = 200, message = "Kafka message sent", offset = result.Offset });
+            }
+            catch (ProduceException<Null, string> ex)
+            {
+                return StatusCode(500, new { status = 500, message = $"Kafka error: {ex.Error.Reason}" });
+            }
+        }
+
 
     }
 }

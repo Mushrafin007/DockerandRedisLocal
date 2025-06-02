@@ -10,6 +10,7 @@ using TestProject.Services.CrudApiService;
 using static TestProject.Model.LoginModel.AuthClass;
 using Microsoft.IdentityModel.Tokens; // Add this using directive
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using static TestProject.Model.MiddlewareModel.Middlewares;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,27 +18,29 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddTransient<ICrudApiService, CrudApiService>();
 builder.Services.AddTransient<CommonFunction>();
-/*Rate limit config*/
-//builder.Services.Configure<IpRateLimitOptions>(builder.Configuration.GetSection("IpRateLimiting"));
-//builder.Services.AddSingleton<IRateLimitConfiguration, RateLimitConfiguration>();
-//builder.Services.AddInMemoryRateLimiting();
-builder.Services.AddMemoryCache();
+
+/*-------------------------------------------------------------Rate limit config---------------------------------------------------------------------------*/
 builder.Services.Configure<IpRateLimitOptions>(
 builder.Configuration.GetSection("IpRateLimiting"));
 builder.Services.AddSingleton<IRateLimitConfiguration, RateLimitConfiguration>();
 builder.Services.AddInMemoryRateLimiting();
-/*Rate limit config*/
+/*-------------------------------------------------------------Rate limit config---------------------------------------------------------------------------*/
 
-/*Redis Config*/
 
+/*--------------------------------------------------------------Redis Config------------------------------------------------------------------------------*/
+builder.Services.AddMemoryCache();
 var redisHost = builder.Configuration["ConnectionStringRedis"];
 builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect($"{redisHost},abortConnect=false"));
 builder.Services.AddHostedService<RedisConsumerService>();
 Console.WriteLine("Connected to Redis!");
+/*--------------------------------------------------------------Redis Config------------------------------------------------------------------------------*/
 
-/*Redis Config*/
+/*--------------------------------------------------------------Kafka Config------------------------------------------------------------------------------*/
+builder.Services.AddHostedService<KafkaConsumerService>();
+builder.Services.Configure<KafkaSettings>(builder.Configuration.GetSection("Kafka"));
+/*--------------------------------------------------------------Kafka Config------------------------------------------------------------------------------*/
 
-/*JWT Config*/
+/*---------------------------------------------------------------JWT Config-------------------------------------------------------------------------------*/
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("JwtSettings"));
 
 var jwtSettings = builder.Configuration.GetSection("JwtSettings").Get<JwtSettings>();
@@ -58,7 +61,8 @@ builder.Services.AddAuthentication("Bearer")
             IssuerSigningKey = new SymmetricSecurityKey(key)
         };
     });
-/*JWT Config*/
+/*---------------------------------------------------------------JWT Config-------------------------------------------------------------------------------*/
+
 
 builder.Services.AddEndpointsApiExplorer();
 //builder.Services.AddSwaggerGen(c =>
